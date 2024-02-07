@@ -6,6 +6,8 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
+let users = []; // 用來追蹤在線用戶的列表
+
 wss.on('connection', function connection(ws) {
   console.log('New client connected');
 
@@ -13,16 +15,13 @@ wss.on('connection', function connection(ws) {
 
   ws.on('message', function incoming(message) {
     console.log('Received:', message);
-    
+
     if (!username) {
       username = message;
-      // 发送新用户加入的通知消息给所有客户端
       const newUserMessage = `${username} joined the chat`;
-      wss.clients.forEach(function each(client) {
-        if (client !== ws && client.readyState === WebSocket.OPEN) {
-          client.send(newUserMessage);
-        }
-      });
+      users.push(username); // 新用戶加入時，將其添加到用戶列表中
+      updateUsers('joined', newUserMessage); // 更新用戶列表並廣播
+
       return;
     }
 
@@ -32,21 +31,34 @@ wss.on('connection', function connection(ws) {
     wss.clients.forEach(function each(client) {
       if (client.readyState === WebSocket.OPEN) {
         // 向所有客户端发送消息
-        client.send(fullMessage);
+        client.send(JSON.stringify({ type: 'message', data: fullMessage }));
       }
     });
   });
 
   ws.on('close', function() {
     if (username) {
+      const index = users.indexOf(username);
       const userLeftMessage = `${username} left the chat`;
-      wss.clients.forEach(function each(client) {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(userLeftMessage);
-        }
-      });
+      if (index !== -1) {
+        users.splice(index, 1); // 從用戶列表中移除離開的用戶
+        updateUsers('left',userLeftMessage); // 更新用戶列表並廣播
+      }
     }
   });
+
+  function updateUsers(type, msg) {
+    const message = JSON.stringify({ type: 'userList', data: users.map(user => user.toString()) });
+    wss.clients.forEach(function each(client) {
+      if (client.readyState === WebSocket.OPEN) {
+        if (msg) {
+          client.send(JSON.stringify({ type, data: msg }));
+        }
+        client.send(message, { binary: false }); // 指定消息的编码格式为UTF-8
+      }
+    });
+  }
+  
 });
 
 server.listen(3000, function listening() {
