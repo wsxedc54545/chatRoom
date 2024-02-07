@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebSocket Chatroom</title>
+</head>
+<body>
+  <input type="text" id="usernameInput" placeholder="Enter your username...">
+  <button id="connectButton">Connect</button>
+  <div id="chatSection" style="display: none;">
+    <div id="messages"></div>
+    <input type="text" id="messageInput" placeholder="Type a message...">
+    <button id="sendButton">Send</button>
+  </div>
+
+  <script>
+    const usernameInput = document.getElementById('usernameInput');
+    const connectButton = document.getElementById('connectButton');
+    const messageInput = document.getElementById('messageInput');
+    const sendButton = document.getElementById('sendButton');
+    const messagesDiv = document.getElementById('messages');
+    const chatSection = document.getElementById('chatSection');
+
+    let username;
+    let webSocket;
+
+    connectButton.addEventListener('click', function() {
+      username = usernameInput.value.trim();
+      if (username !== '') {
+        // 隐藏用户名输入框和连接按钮，并显示聊天界面
+        usernameInput.disabled = true;
+        connectButton.disabled = true;
+        chatSection.style.display = 'block';
+
+        // 连接 WebSocket 服务器
+        webSocket = new WebSocket('ws://localhost:3000');
+        webSocket.onopen = function() {
+          console.log('WebSocket connected');
+          // 在连接成功后将用户名发送给服务器
+          webSocket.send(username);
+        };
+        
+        webSocket.onmessage = function(event) {
+          const message = event.data;
+          const startsWith = message.startsWith(username);
+          if (message.includes('joined the chat') || message.includes('left the chat')) {
+            displayNotification(message);
+          } else {
+            displayMessage(message);
+          }
+        };
+      }
+    });
+
+    sendButton.addEventListener('click', function() {
+      const message = messageInput.value.trim();
+      if (message !== '') {
+        // 发送消息给服务器
+        webSocket.send(message);
+        messageInput.value = '';
+      }
+    });
+
+    // enter發送
+    usernameInput.addEventListener('keydown', function(event) {
+      if (event.key === 'Enter') {
+        connectButton.click();
+      }
+    });
+    messageInput.addEventListener('keydown', function(event) {
+      if (event.key === 'Enter') {
+        sendButton.click();
+      }
+    });
+
+    // 将消息显示在界面上的函数
+    function displayMessage(message) {
+      console.log("message: ", message);
+      const messageDiv = document.createElement('div');
+      messageDiv.textContent = message;
+      messagesDiv.appendChild(messageDiv);
+    }
+
+    // 将通知消息显示在界面上的函数
+    function displayNotification(notification) {
+      const notificationDiv = document.createElement('div');
+      notificationDiv.textContent = notification;
+      notificationDiv.style.fontStyle = 'italic';
+      messagesDiv.appendChild(notificationDiv);
+    }
+  </script>
+</body>
+</html>
